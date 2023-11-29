@@ -1,3 +1,82 @@
-// РІСЃС‚Р°РІСЊС‚Рµ СЃСЋРґР° РІР°С€ РєРѕРґ РґР»СЏ РєР»Р°СЃСЃР° ArrayPtr
-// РІРЅРµСЃРёС‚Рµ РІ РЅРµРіРѕ РёР·РјРµРЅРµРЅРёСЏ, 
-// РєРѕС‚РѕСЂС‹Рµ РїРѕР·РІРѕР»СЏС‚ СЂРµР°Р»РёР·РѕРІР°С‚СЊ move-СЃРµРјР°РЅС‚РёРєСѓ
+#pragma once
+#include <cassert>
+#include <cstdlib>
+////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//
+//  Сдаю данную работу т.к есть данный файл.. SimpleVector мне гораздо удобней было сделать
+//   без данного "умного" класса.
+//
+////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+template <typename Type>
+class ArrayPtr {
+public:
+    // Инициализирует ArrayPtr нулевым указателем
+    ArrayPtr() = default;
+
+    // Создаёт в куче массив из size элементов типа Type.
+    // Если size == 0, поле raw_ptr_ должно быть равно nullptr
+    explicit ArrayPtr(size_t size) {
+        if (size > 0) {
+            Type* array = new Type[size];
+            raw_ptr_ = array;
+        }
+        else ArrayPtr();
+    }
+
+    // Конструктор из сырого указателя, хранящего адрес массива в куче либо nullptr
+    explicit ArrayPtr(Type* raw_ptr)  noexcept : raw_ptr_(raw_ptr) {
+        raw_ptr_ = raw_ptr;
+    }
+
+    // Запрещаем копирование
+    ArrayPtr(const ArrayPtr&) = delete;
+
+    ~ArrayPtr() {
+        delete[] raw_ptr_;
+    }
+
+    // Запрещаем присваивание
+    ArrayPtr& operator=(const ArrayPtr&) = delete;
+
+    // Прекращает владением массивом в памяти, возвращает значение адреса массива
+    // После вызова метода указатель на массив должен обнулиться
+    [[nodiscard]] Type* Release() noexcept {
+        Type* raw = raw_ptr_;
+        raw_ptr_ = nullptr;
+        return raw;
+    }
+
+    // Возвращает ссылку на элемент массива с индексом index
+    Type& operator[](size_t index) noexcept {
+        return raw_ptr_[index];
+    }
+
+    // Возвращает константную ссылку на элемент массива с индексом index
+    const Type& operator[](size_t index) const noexcept {
+        const Type& link = raw_ptr_[index];
+        return link;
+    }
+
+    // Возвращает true, если указатель ненулевой, и false в противном случае
+    explicit operator bool() const {
+        // Заглушка. Реализуйте операцию самостоятельно
+        return (raw_ptr_ != nullptr);
+    }
+
+    // Возвращает значение сырого указателя, хранящего адрес начала массива
+    Type* Get() const noexcept {
+        return raw_ptr_;
+    }
+
+    // Обменивается значениям указателя на массив с объектом other
+    void swap(ArrayPtr& other) noexcept {
+        Type* tmp = this->raw_ptr_;
+        this->raw_ptr_ = other.raw_ptr_;
+        other.raw_ptr_ = tmp;
+
+    }
+
+private:
+    Type* raw_ptr_ = nullptr;
+};
