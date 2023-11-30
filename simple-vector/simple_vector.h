@@ -6,6 +6,7 @@
 #include <algorithm>
 #include <stdexcept>
 #include <iterator>
+#include "array_ptr.h"
 
 struct ReserveProxyObject {
     size_t reserve;
@@ -37,9 +38,6 @@ public:
 
     // Создаёт вектор из std::initializer_list
     SimpleVector(std::initializer_list<Type> init);
-
-    //Деструктор
-    ~SimpleVector();
 
     //Копирующий
     SimpleVector(const SimpleVector& other);
@@ -78,11 +76,13 @@ public:
 
     // Возвращает ссылку на элемент с индексом index
     Type& operator[](size_t index) noexcept {
+        assert(index < now_);
         return main_vector_[index];
     }
 
     // Возвращает константную ссылку на элемент с индексом index
     const Type& operator[](size_t index) const noexcept {
+        assert(index < now_);
         return main_vector_[index];
     }
 
@@ -149,37 +149,37 @@ public:
    // Возвращает итератор на начало массива
    // Для пустого массива может быть равен (или не равен) nullptr
     Iterator begin() noexcept {
-        return main_vector_;
+        return main_vector_.Get();
     }
 
     // Возвращает итератор на элемент, следующий за последним
     // Для пустого массива может быть равен (или не равен) nullptr
     Iterator end() noexcept {
-        return  main_vector_ + now_;
+        return  main_vector_.Get() + now_;
     }
 
     // Возвращает константный итератор на начало массива
     // Для пустого массива может быть равен (или не равен) nullptr
     ConstIterator begin() const noexcept {
-        return  main_vector_;
+        return  main_vector_.Get();
     }
 
     // Возвращает итератор на элемент, следующий за последним
     // Для пустого массива может быть равен (или не равен) nullptr
     ConstIterator end() const noexcept {
-        return main_vector_ + now_;
+        return main_vector_.Get() + now_;
     }
 
     // Возвращает константный итератор на начало массива
     // Для пустого массива может быть равен (или не равен) nullptr
     ConstIterator cbegin() const noexcept {
-        return  main_vector_;
+        return  main_vector_.Get();
     }
 
     // Возвращает итератор на элемент, следующий за последним
     // Для пустого массива может быть равен (или не равен) nullptr
     ConstIterator cend() const noexcept {
-        return main_vector_ + now_;
+        return main_vector_.Get() + now_;
     }
 
     //////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -218,19 +218,19 @@ public:
 
 
 private:
-   
+
     size_t now_ = 0;
     size_t cap_ = 0;
-    Type* main_vector_ = nullptr;
+    ArrayPtr<Type> main_vector_;
 
-    
     //Перевыделяет размер и копирует старый вектор в новый в случае нехватки cap_
     void RepeatPatternPushback();
-   //Перевыделяет размер и копирует старый вектор в новый в случае нехватки cap_ и вставляет элемент
+
+    //Перевыделяет размер и копирует старый вектор в новый в случае нехватки cap_ и вставляет элемент
     template<typename Value>
     void RepeatPatternInsert(size_t elem_num, Iterator constcasted, Value& value);
-    //Уничтожает содержимое Type* main_vector_
-    void Destroy();
+
+
 };
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -255,33 +255,25 @@ template <typename Type>
 SimpleVector<Type>::SimpleVector() noexcept = default;
 
 template <typename Type>
-SimpleVector<Type>::SimpleVector(size_t size) : now_(size), cap_(size) {
-    main_vector_ = new Type[size];
+SimpleVector<Type>::SimpleVector(size_t size) : now_(size), cap_(size), main_vector_(size)  {
     std::fill(begin(), end(), 0);
 }
 
 template <typename Type>
-SimpleVector<Type>::SimpleVector(size_t size, const Type& value) : now_(size), cap_(size) {
-    main_vector_ = new Type[size];
+SimpleVector<Type>::SimpleVector(size_t size, const Type& value) : now_(size), cap_(size), main_vector_(size) {
     std::fill(begin(), end(), value);
 }
 
 template <typename Type>
-SimpleVector<Type>::SimpleVector(std::initializer_list<Type> init) : now_(init.size()), cap_(init.size()) {
-    main_vector_ = new Type[init.size()];
+SimpleVector<Type>::SimpleVector(std::initializer_list<Type> init) : now_(init.size()), cap_(init.size()), main_vector_(init.size()) {
     std::move(init.begin(), init.end(), begin());
 }
 
-template <typename Type>
-SimpleVector<Type>::~SimpleVector() {
-    Destroy();
-}
+
 
 template <typename Type>
-SimpleVector<Type>::SimpleVector(const SimpleVector& other) : now_(other.now_), cap_(other.cap_) {
-    Type* dynamic_arr = new Type[now_];
-    std::copy(other.begin(), other.end(), dynamic_arr);
-    main_vector_ = dynamic_arr;
+SimpleVector<Type>::SimpleVector(const SimpleVector& other) : now_(other.now_), cap_(other.cap_), main_vector_(now_) {
+    std::copy(other.begin(), other.end(), begin());
 }
 
 template <typename Type>
@@ -298,13 +290,9 @@ SimpleVector<Type>::SimpleVector(ReserveProxyObject obj) {
 }
 
 template <typename Type>
-SimpleVector<Type>::SimpleVector(SimpleVector&& other) {
+SimpleVector<Type>::SimpleVector(SimpleVector&& other) : main_vector_(other.GetSize()) {
     if (this == &other) return;
-    main_vector_ = other.main_vector_;
-    now_ = other.now_;
-    cap_ = other.cap_;
-    other.main_vector_ = nullptr;
-    other.cap_ = other.now_ = 0;
+    swap(other);
 }
 
 template <typename Type>
@@ -322,7 +310,7 @@ SimpleVector<Type>& SimpleVector<Type>::operator=(SimpleVector<Type>&& rhs) {
 ///                                               РЕАЛИЗАЦИЯ
 ///
 /// 
-/// ////////////////////////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 
 template <typename Type>
@@ -332,7 +320,7 @@ void SimpleVector<Type>::Clear() noexcept {
 
 template <typename Type>
 void SimpleVector<Type>::swap(SimpleVector& other) noexcept {
-    std::swap(this->main_vector_, other.main_vector_);
+    main_vector_.swap(other.main_vector_);
     std::swap(this->cap_, other.cap_);
     std::swap(this->now_, other.now_);
 }
@@ -358,6 +346,7 @@ void SimpleVector<Type>::PushBack(Type&& item) {
 
 template <typename Type>
 Type* SimpleVector<Type>::Insert(ConstIterator pos, const Type& value) {
+    assert(pos >= begin() && pos <= end());
     Iterator constcasted = const_cast<Iterator>(&*pos);
     size_t elem_num = std::distance(cbegin(), pos);
     if (now_ >= cap_) {
@@ -368,11 +357,12 @@ Type* SimpleVector<Type>::Insert(ConstIterator pos, const Type& value) {
         main_vector_[elem_num] = value;
     }
     ++now_;
-    return Iterator(main_vector_ + elem_num);
+    return Iterator(main_vector_.Get() + elem_num);
 }
 
 template <typename Type>
 Type* SimpleVector<Type>::Insert(ConstIterator pos, Type&& value) {
+    assert(pos >= begin() && pos <= end());
     Iterator constcasted = const_cast<Iterator>(&*pos);
     size_t elem_num = std::distance(cbegin(), pos);
 
@@ -384,7 +374,7 @@ Type* SimpleVector<Type>::Insert(ConstIterator pos, Type&& value) {
         main_vector_[elem_num] = std::move(value);
     }
     ++now_;
-    return Iterator(main_vector_ + elem_num);
+    return Iterator(main_vector_.Get() + elem_num);
 }
 
 template <typename Type>
@@ -394,7 +384,7 @@ void SimpleVector<Type>::PopBack() noexcept {
 
 template <typename Type>
 Type* SimpleVector<Type>::Erase(const Type* pos) {
-
+    assert(pos >= begin() && pos <= end());
     if (now_ > 0) {
         Iterator constcasted = const_cast<Iterator>(&*pos);
         std::move(constcasted + 1, end(), constcasted);
@@ -407,10 +397,9 @@ Type* SimpleVector<Type>::Erase(const Type* pos) {
 template <typename Type>
 void SimpleVector<Type>::Reserve(size_t new_capacity) {
     if (new_capacity > this->cap_) {
-        Type* dynamic_arr = new Type[new_capacity];
-        std::move(begin(), end(), dynamic_arr);
-        Destroy();
-        main_vector_ = dynamic_arr;
+        ArrayPtr<Type> ptr(new_capacity);
+        std::move(begin(), end(), ptr.Get());
+        main_vector_.swap(ptr);
         this->cap_ = new_capacity;
     }
 }
@@ -422,13 +411,13 @@ void SimpleVector<Type>::Resize(size_t new_size) {
     }
 
     else {
-        Type* dynamic_arr = new Type[new_size];
+        //Type* dynamic_arr = new Type[new_size];
+        ArrayPtr<Type> ptr(new_size);
         for (size_t i = 0; i < new_size; ++i) {
-            dynamic_arr[i] = std::move(Type());
+            ptr[i] = std::move(Type());
         }
-        std::move(begin(), end(), dynamic_arr);
-        Destroy();
-        main_vector_ = dynamic_arr;
+        std::move(begin(), end(), ptr.Get());
+        main_vector_.swap(ptr);
         now_ = new_size;
         cap_ = new_size;
     }
@@ -449,12 +438,11 @@ void SimpleVector<Type>::RepeatPatternInsert(size_t elem_num, Type* constcasted,
 
     if (cap_ > 0)cap_ *= 2;
     else cap_ = 1;
-    Type* dynamic_arr = new Type[cap_];
-    std::move(begin(), constcasted, dynamic_arr);
-    dynamic_arr[elem_num] = std::move(value);
-    std::move(constcasted, end(), dynamic_arr + elem_num + 1);
-    Destroy();
-    main_vector_ = dynamic_arr;
+    ArrayPtr<Type> ptr(cap_);
+    std::move(begin(), constcasted, ptr.Get());
+    ptr[elem_num] = std::move(value);
+    std::move(constcasted, end(), ptr.Get() + elem_num + 1);
+    main_vector_.swap(ptr);
 }
 
 
@@ -462,13 +450,8 @@ template<typename Type>
 void SimpleVector<Type>::RepeatPatternPushback() {
     if (cap_ > 0)cap_ *= 2;
     else cap_ = 1;
-    Type* dynamic_arr = new Type[cap_];
-    std::move(begin(), end(), dynamic_arr);
-    Destroy();
-    main_vector_ = dynamic_arr;
+    ArrayPtr<Type> ptr(cap_);
+    std::move(begin(), end(), ptr.Get());
+    main_vector_.swap(ptr);
 }
 
-template<typename Type>
-void SimpleVector<Type>::Destroy() {
-    delete[] main_vector_;
-}

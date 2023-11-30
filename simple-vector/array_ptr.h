@@ -1,12 +1,7 @@
 #pragma once
 #include <cassert>
 #include <cstdlib>
-////////////////////////////////////////////////////////////////////////////////////////////////////////////
-//
-//  Сдаю данную работу т.к есть данный файл.. SimpleVector мне гораздо удобней было сделать
-//   без данного "умного" класса.
-//
-////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 
 template <typename Type>
 class ArrayPtr {
@@ -31,14 +26,24 @@ public:
 
     // Запрещаем копирование
     ArrayPtr(const ArrayPtr&) = delete;
+    // Запрещаем присваивание
+    ArrayPtr& operator=(const ArrayPtr&) = delete;
+
+    ArrayPtr(ArrayPtr&& rhs) {
+        swap(rhs.raw_ptr_);
+    };
+
+    ArrayPtr& operator=(ArrayPtr&& rhs) {
+        if (this == &rhs) return *this;
+        swap(rhs.raw_ptr_);
+        return *this;
+    };
 
     ~ArrayPtr() {
         delete[] raw_ptr_;
     }
 
-    // Запрещаем присваивание
-    ArrayPtr& operator=(const ArrayPtr&) = delete;
-
+    
     // Прекращает владением массивом в памяти, возвращает значение адреса массива
     // После вызова метода указатель на массив должен обнулиться
     [[nodiscard]] Type* Release() noexcept {
@@ -60,7 +65,6 @@ public:
 
     // Возвращает true, если указатель ненулевой, и false в противном случае
     explicit operator bool() const {
-        // Заглушка. Реализуйте операцию самостоятельно
         return (raw_ptr_ != nullptr);
     }
 
@@ -74,9 +78,11 @@ public:
         Type* tmp = this->raw_ptr_;
         this->raw_ptr_ = other.raw_ptr_;
         other.raw_ptr_ = tmp;
-
     }
 
 private:
     Type* raw_ptr_ = nullptr;
+   
 };
+
+
