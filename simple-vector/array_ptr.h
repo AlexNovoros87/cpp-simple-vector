@@ -34,8 +34,9 @@ public:
     };
 
     ArrayPtr& operator=(ArrayPtr&& rhs) {
-        if (this == &rhs) return *this;
-        swap(rhs.raw_ptr_);
+        if (this != &rhs) {
+            swap(rhs.raw_ptr_);
+        }
         return *this;
     };
 
